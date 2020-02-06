@@ -31,7 +31,9 @@ buff = np.zeros([dsp_buff], dtype=np.complex64)
 
 # Load Neural model
 model = CursedNet(input_ch=2, output_ch=1)
-model.load_state_dict(torch.load('runs/PROTO1/model_save_epoch_25.pth'))
+dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model.load_state_dict(torch.load('runs/PROTO_V3_TANH/model_save_epoch_125.pth'))
+model = model.to(dev)
 model.eval()
 
 
@@ -40,8 +42,8 @@ def process(outdata, f, t, s):
     inp = que.get()
     inp = np.stack([np.real(inp), np.imag(inp)])
     inp = np.expand_dims(inp, axis=0).astype(np.float32)
-    res = model(torch.tensor(inp))[0]
-    outdata[:, 0] = res.detach().numpy()
+    res = model(torch.tensor(inp).to(dev))[0]
+    outdata[:, 0] = res.cpu().detach().numpy()
 
 
 # Graceful Exit Handler

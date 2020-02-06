@@ -7,7 +7,10 @@ class conv_block(nn.Module):
         super(conv_block, self).__init__()
 
         self.conv = nn.Sequential(
-            nn.Conv1d(in_ch, out_ch, kernel_size=3, stride=1, padding=1),
+            nn.Conv1d(in_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=True),
+            nn.BatchNorm1d(out_ch),
+            nn.Tanh(),
+            nn.Conv1d(out_ch, out_ch, kernel_size=3, stride=1, padding=1, bias=True),
             nn.BatchNorm1d(out_ch),
             nn.Tanh())
 
@@ -27,14 +30,14 @@ class CursedNet(nn.Module):
         self.Maxpool2 = nn.MaxPool1d(kernel_size=2, stride=2)
         self.Maxpool3 = nn.MaxPool1d(kernel_size=2, stride=2)
 
-        self.Conv1 = conv_block(input_ch, 16)
-        self.Conv2 = conv_block(16, 32)
-        self.Conv3 = conv_block(32, 32)
-        self.Conv4 = conv_block(32, 16)
-        self.Conv5 = conv_block(16, 8)
-        self.Conv6 = conv_block(8, 4)
-        self.Conv7 = conv_block(4, 2)
-        self.Conv8 = nn.Conv1d(2, output_ch, kernel_size=1,
+        self.Conv1 = conv_block(input_ch, 32)
+        self.Conv2 = conv_block(32, 64)
+        self.Conv3 = conv_block(64, 64)
+        self.Conv4 = conv_block(64, 32)
+        self.Conv5 = conv_block(32, 16)
+        self.Conv6 = conv_block(16, 8)
+        self.Conv7 = conv_block(8, 4)
+        self.Conv8 = nn.Conv1d(4, output_ch, kernel_size=1,
                                stride=1, padding=0)
 
         self.tanh = nn.Tanh()

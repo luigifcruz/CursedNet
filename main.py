@@ -6,14 +6,14 @@ from model import CursedNet
 
 # Declare Global Settings
 root_dir = "dataset"
-learning_rate = 0.0001
-epochs = 150
+learning_rate = 0.01
+epochs = 500
 percentages = [0.85, 0.15, 0.00] # Training, Validation, Testing
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Declare Interation Settings
 interations = [
-    {"model": CursedNet, "batch_size": 1, "save_dir": "runs/PROTO_V3_TANH"},
+    {"model": CursedNet, "batch_size": 2, "save_dir": "runs/PROTO_V2"},
 ]
 
 if __name__ == "__main__":

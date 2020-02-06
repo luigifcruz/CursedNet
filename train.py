@@ -2,6 +2,8 @@ import os
 import shutil
 from tqdm import tqdm
 import numpy as np
+import re
+import os
 
 import torch
 from torch.utils.data import DataLoader, random_split
@@ -41,6 +43,20 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
     if not os.path.isdir(save_dir):
         os.mkdir(save_dir)
 
+    # Load Existing Models
+    cks = [f for f in os.listdir(save_dir)
+           if re.match(r'(.*)\.(pth)', f)]
+    cks.sort()
+    
+    if len(cks) > 0:
+        latest = cks[-1]
+        epoch = int(latest.split('_')[-1].split('.')[0])
+
+        print("Loading model:", latest, "| Epoch:", epoch)
+        model.load_state_dict(torch.load(os.path.join(save_dir, latest)))
+    else:
+        epoch = 0
+
     # Load Datasets
     dataset = MultiChannelDataset(root_dir)
     n_samples = [int((len(dataset) * p) + 0.5) for p in percentages] 
@@ -53,6 +69,7 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
     model = model.to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), betas=(0.5, 0.999), lr=learning_rate)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True, patience=5)
     criterion = torch.nn.MSELoss()
 
     # Logging Settings
@@ -76,11 +93,10 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
     print(info)
 
     # Run the Model
-    global_step = 0
-    for epoch in range(epochs):
+    global_step = epoch * n_samples[0]
+    for epoch in range(epoch, epochs):
         model.train()
 
-        epoch_step = 1
         epoch_loss = 0
         with tqdm(total=n_samples[0], desc=f'Epoch {epoch + 1}/{epochs}', unit='vec') as pbar:
             for batch in train_loader:
@@ -95,7 +111,7 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
 
                 epoch_loss += loss.item()
                 writer.add_scalar('Training Loss', loss.item(), global_step)
-                pbar.set_postfix(**{'epoch_loss': epoch_loss/epoch_step})
+                pbar.set_postfix(**{'batch_loss': loss.item()})
 
                 optimizer.zero_grad()
                 loss.backward()
@@ -103,11 +119,11 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
 
                 pbar.update(inputs.shape[0])
                 global_step += 1
-                epoch_step += 1
 
-            val_score = eval_net(model, val_loader, device, n_samples[1], writer, global_step)
-            logger.info('Validation Loss: {}'.format(val_score))
-            writer.add_scalar('Validation Loss', val_score, global_step)
+            val_loss = eval_net(model, val_loader, device, n_samples[1], writer, global_step)
+            logger.info('Validation Loss: {}'.format(val_loss))
+            writer.add_scalar('Validation Loss', val_loss, global_step)
+            scheduler.step(val_loss)
 
             audio = output.cpu().detach().numpy()
             print("TMax:", np.max(audio), "TMin:", np.min(audio), audio.shape)
