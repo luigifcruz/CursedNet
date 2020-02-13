@@ -12,6 +12,7 @@ from torchvision import transforms, utils
 
 from dataset import MultiChannelDataset
 from eval import eval_net
+from utils import get_lr
 
 import logging
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
@@ -19,7 +20,7 @@ formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 def setup_logger(log_file, level=logging.INFO):
     """To setup as many loggers as you want"""
 
-    handler = logging.FileHandler(log_file)        
+    handler = logging.FileHandler(log_file, "a")        
     handler.setFormatter(formatter)
 
     name = np.random.randint(2**32)
@@ -29,7 +30,7 @@ def setup_logger(log_file, level=logging.INFO):
 
     return logger
 
-def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentages, device):
+def run(model, root_dir, save_dir, batch_size, learning_rate, min_lr, epochs, percentages, device, patience):
     model = model(input_ch=1, output_ch=1)
 
     # Generate Necessary Files
@@ -50,7 +51,7 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
  
     if len(cks) > 0:
         epoch = cks[-1]
-        latest = "model_save_epoch_{:02}.pth".format(epoch)
+        latest = "model_save_epoch_{}.pth".format(epoch)
 
         print("Loading model Epoch:", epoch)
         model.load_state_dict(torch.load(os.path.join(save_dir, latest)))
@@ -70,7 +71,7 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
 
     global_step = epoch * n_samples[0]
     optimizer = torch.optim.Adam(model.parameters(), betas=(0.5, 0.999), lr=learning_rate)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True, patience=1)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True, patience=patience)
     criterion = torch.nn.MSELoss()
 
     # Logging Settings
@@ -81,7 +82,9 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
     Starting training:
     Epochs:          {epochs}
     Batch size:      {batch_size}
-    Learning rate:   {learning_rate}
+    Learning Rate:   {learning_rate}
+    Minimum LR:      {min_lr}
+    Patience:        {patience}
     Dataset Setting: {percentages}
     Training size:   {n_samples[0]}
     Validation size: {n_samples[1]}
@@ -122,6 +125,10 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
             logger.info('Validation Loss: {}'.format(val_loss))
             writer.add_scalar('Validation Loss', val_loss, global_step)
             scheduler.step(val_loss)
+
+            if get_lr(optimizer) <= min_lr:
+                logger.info('Minimum Learning Rate Reached: Early Stopping')
+                break
 
             audio = output.cpu().detach().numpy()
             print("TMax:", np.max(audio), "TMin:", np.min(audio), audio.shape)
