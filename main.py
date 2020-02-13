@@ -13,7 +13,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Declare Interation Settings
 interations = [
-    {"model": CursedNet, "batch_size": 2, "save_dir": "runs/PROTO_V2"},
+    {"model": CursedNet, "batch_size": 2, "save_dir": "runs/PROTO_V2_IMAG"},
 ]
 
 if __name__ == "__main__":

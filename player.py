@@ -32,7 +32,7 @@ buff = np.zeros([dsp_buff], dtype=np.complex64)
 # Load Neural model
 model = CursedNet(input_ch=2, output_ch=1)
 dev = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model.load_state_dict(torch.load('runs/PROTO_V3_TANH/model_save_epoch_125.pth'))
+model.load_state_dict(torch.load('runs/PROTO_V2/model_save_epoch_15.pth'))
 model = model.to(dev)
 model.eval()
 

@@ -30,7 +30,7 @@ def setup_logger(log_file, level=logging.INFO):
     return logger
 
 def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentages, device):
-    model = model(input_ch=2, output_ch=1)
+    model = model(input_ch=1, output_ch=1)
 
     # Generate Necessary Files
     if os.path.isdir(save_dir):
@@ -44,15 +44,15 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
         os.mkdir(save_dir)
 
     # Load Existing Models
-    cks = [f for f in os.listdir(save_dir)
+    cks = [int(f.split('_')[-1].split('.')[0]) for f in os.listdir(save_dir)
            if re.match(r'(.*)\.(pth)', f)]
     cks.sort()
-    
+ 
     if len(cks) > 0:
-        latest = cks[-1]
-        epoch = int(latest.split('_')[-1].split('.')[0])
+        epoch = cks[-1]
+        latest = "model_save_epoch_{:02}.pth".format(epoch)
 
-        print("Loading model:", latest, "| Epoch:", epoch)
+        print("Loading model Epoch:", epoch)
         model.load_state_dict(torch.load(os.path.join(save_dir, latest)))
     else:
         epoch = 0
@@ -68,13 +68,14 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
     # Build the Network
     model = model.to(device)
 
+    global_step = epoch * n_samples[0]
     optimizer = torch.optim.Adam(model.parameters(), betas=(0.5, 0.999), lr=learning_rate)
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True, patience=5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', verbose=True, patience=1)
     criterion = torch.nn.MSELoss()
 
     # Logging Settings
     logger = setup_logger(os.path.join(save_dir, "model_run.log"))
-    writer = SummaryWriter(log_dir=save_dir)
+    writer = SummaryWriter(log_dir=save_dir, purge_step=global_step)
 
     info = f'''
     Starting training:
@@ -93,11 +94,9 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
     print(info)
 
     # Run the Model
-    global_step = epoch * n_samples[0]
     for epoch in range(epoch, epochs):
         model.train()
 
-        epoch_loss = 0
         with tqdm(total=n_samples[0], desc=f'Epoch {epoch + 1}/{epochs}', unit='vec') as pbar:
             for batch in train_loader:
                 inputs = batch["input"]
@@ -109,7 +108,6 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
                 output_pred = model(inputs)
                 loss = criterion(output_pred, output)
 
-                epoch_loss += loss.item()
                 writer.add_scalar('Training Loss', loss.item(), global_step)
                 pbar.set_postfix(**{'batch_loss': loss.item()})
 
@@ -139,4 +137,6 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, epochs, percentage
 
     writer.close()
     logger.info('Training finished, exiting...')
+    torch.save(model.state_dict(), os.path.join(save_dir, "model_save_epoch_{}.pth".format(epoch)))
+    logger.info('Final checkpoint {} saved!'.format(epoch))
     del model
