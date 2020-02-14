@@ -58,9 +58,21 @@ def run(model, root_dir, save_dir, batch_size, learning_rate, min_lr, epochs, pe
     else:
         epoch = 0
 
+    # Load/Generate Deterministic Seed for Dataset Random Split
+    seed = np.random.randint(2**32)
+    seed_dir = os.path.join(save_dir, "dataset_seed.npy")
+
+    if os.path.isfile(seed_dir):
+        seed = np.load(seed_dir)
+        print("Load deterministic seed for dataset.")
+    else:
+        np.save(seed_dir, seed)
+    
     # Load Datasets
     dataset = MultiChannelDataset(root_dir)
     n_samples = [int((len(dataset) * p) + 0.5) for p in percentages] 
+    
+    torch.manual_seed(seed)
     samples = random_split(dataset, n_samples)
 
     train_loader = DataLoader(samples[0], batch_size=batch_size, shuffle=True, num_workers=4, pin_memory=True)
